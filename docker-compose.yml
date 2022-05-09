@@ -1,0 +1,62 @@
+version: "2.3"
+services:
+  rabbitmq3:
+    container_name: "rabbitmq"
+    image: rabbitmq:3.8-management-alpine
+    environment:
+      - RABBITMQ_DEFAULT_USER=myuser
+      - RABBITMQ_DEFAULT_PASS=mypassword
+    ports:
+      # AMQP protocol port
+      - '5672:5672'
+      # HTTP management UI
+      - '15672:15672'
+  mongodb:
+    container_name: "mongodb"
+    image: mongo:latest
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=rootpassword
+    ports:
+      - 27017:27017
+  server:
+    build:
+      context: .
+    image: flask-starter
+    # command: python server.py
+    # restart: always
+    container_name: flask-starter
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - PYTHON_ENV=production
+      - CELERY_BROKER_URL=amqp://myuser:mypassword@host.docker.internal:5672/
+      - CELERY_BACKEND_URL=mongodb://root:rootpassword@host.docker.internal:27017/
+
+    # env_file:
+    #   - .env
+    depends_on:
+      - rabbitmq3
+      - mongodb
+  worker:
+      build:
+        context: ./
+      command: "-A app.celery_app:celery worker --pool threads --loglevel=info"
+      user: root
+      hostname: worker
+      image: celery-worker
+      restart: always
+      container_name: celery-worker
+      entrypoint: celery
+      volumes:
+        - .:/app
+      environment:
+        - CHOKIDAR_USEPOLLING=true
+        - PYTHON_ENV=production
+      depends_on:
+        - rabbitmq3
+        - server
+        - mongodb

@@ -1,0 +1,8 @@
+Flask
+Flask-Cors
+ConfigParser
+gunicorn
+gevent
+celery
+pika
+pymongo
